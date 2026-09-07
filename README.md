@@ -1,119 +1,145 @@
-# NN-CA7-1.Cryptocurrency-Price-Estimation-Using-LSTM-2.Violence-Detection-in-Videos-Using-ResNet50
+# LSTM Forecasting and Violence Detection
 
-### 1.Cryptocurrency Price Estimation Using LSTM [Link](#part-1-cryptocurrency-price-estimation-using-lstm)
+Two projects built on temporal data. One predicts cryptocurrency prices from a
+30-day window with recurrent models; the other classifies short video clips as
+violent or not using per-frame CNN features and a convolutional LSTM.
 
-### 2.Violence Detection in Videos Using ResNet50 [Link](#part-2-violence-detection-in-videos-using-resnet50)
+![Sample frames from each class](docs/violence_frames.png)
 
-# Part 1: Cryptocurrency Price Estimation Using LSTM
+## Requirements
 
-## Overview
+Python 3.10 or later. Both projects need their own data: a daily price series per
+coin, and a labelled video clip dataset. A GPU is recommended for the video
+model.
 
-This repository contains code and data for a study on estimating cryptocurrency prices using LSTM and GRU models. The models are implemented and evaluated on Litecoin and Monero datasets up to 2023.
+## Installation
 
-## Models
+```bash
+pip install -e .
+```
 
-### LSTM vs. GRU
+With the test suite:
 
-- LSTM is a more complex architecture compared to GRU. It consists of a memory cell and three gates (reset gate, update gate) whereas GRU has three gates (input gate, forget gate, output gate).
+```bash
+pip install -e ".[dev]"
+```
 
-- LSTM uses a memory cell to store information for long-term dependencies. The forget gate determines what information in the memory cell should be retained, and the input gate determines what new information to store.
+## Usage
 
-- GRU also has a memory element, but it lacks a separate memory cell. Instead, it uses an update gate to decide how much of the past information to forget and how much of the new information to store.
+Forecast prices:
 
-- GRU is computationally less expensive than LSTM due to its simpler architecture. However, LSTM requires more time and data for convergence.
+```python
+from forecasting import build_hybrid_model, errors, split
 
-- In practice, the performance of LSTM and GRU depends on the specific task and dataset.
+windows = split(prices, window=30, horizon=1)
+model = build_hybrid_model()
+model.fit(windows.x_train, windows.y_train, epochs=50, batch_size=32)
 
-### Model Usage
+predicted = windows.scaler.inverse_transform(model.predict(windows.x_test))
+actual = windows.scaler.inverse_transform(windows.y_test)
+print(errors(actual, predicted).format())
+```
 
-In this study, both LSTM and GRU architectures are used. Two LSTM layers and one GRU layer process input data in parallel. A linear layer is then used to calculate the predicted price.
+Build and score the video classifier:
 
-## Dataset and Preprocessing
+```python
+from violence_detection import build_model, from_predictions
 
-- Datasets for both cryptocurrencies are obtained from their respective sources, covering data up to 2023. The 'Price' is selected as the target feature.
-
-- Preprocessing includes max-min normalization of the data.
-
-## Model Training
-
-- Both LSTM and GRU models are implemented and trained for 100 epochs.
-
-- No validation dataset is used, and Early Stopping is not applied.
-
-## Results
-
-### 1-Day Window
-
-| Model    | Currency | MSE    | RMSE  | MAE  | MAPE  |
-| -------- | -------- | ------ | ----- | ---- | ----- |
-| LSTM     | Litecoin | 82.33  | 9.07  | 5.37 | 0.06  |
-|          | Monero   | 162.31 | 12.74 | 7.61 | 0.06  |
-| Proposed | Litecoin | 72.62  | 8.52  | 5.04 | 0.06  |
-|          | Monero   | 123.30 | 11.10 | 6.76 | 0.006 |
-
-### 3-Day Window
-
-| Model    | Currency | MSE    | RMSE  | MAE  | MAPE |
-| -------- | -------- | ------ | ----- | ---- | ---- |
-| LSTM     | Litecoin | 144.43 | 12.02 | 6.43 | 0.07 |
-|          | Monero   | 237.28 | 15.40 | 8.87 | 0.06 |
-| Proposed | Litecoin | 146.86 | 12.12 | 6.37 | 0.07 |
-|          | Monero   | 214.04 | 14.63 | 8.55 | 0.07 |
-
-### 7-Day Window
-
-| Model    | Currency | MSE    | RMSE  | MAE   | MAPE |
-| -------- | -------- | ------ | ----- | ----- | ---- |
-| LSTM     | Litecoin | 256.08 | 16.00 | 8.68  | 0.09 |
-|          | Monero   | 413.52 | 20.34 | 11.51 | 0.08 |
-| Proposed | Litecoin | 265.06 | 16.28 | 8.71  | 0.09 |
-|          | Monero   | 393.44 | 19.84 | 11.41 | 0.09 |
-
-## Conclusion
-
-Both LSTM and GRU models are evaluated for estimating cryptocurrency prices. Results suggest that the performance of these models can vary based on the specific task and dataset. LSTM tends to perform better in tasks where long-term memory is crucial.
-
-For more detailed information, please refer to the article.
-
-# Part 2: Violence Detection in Videos Using ResNet50
-
-## Data Acquisition and Preprocessing
-
-In this project, in the DataLoader class, for each batch, we perform the following tasks:
-
-1. Determine the label for the film.
-2. Load the film and extract its frames.
-3. Then, for the desired number of frames (i.e., 10), we perform the following tasks:
-
-   - Extract two consecutive frames, subtract them, and save the result. The reason for this step is that, in the meantime, we also save 10 frames from both classes (violence and non-violence) from a film in one of the pre-defined folders, resulting in the following structure.
-
-   Finally, we skip frames in intervals.
-
-## Preprocessing Steps as Described in the Article
-
-For the preprocessing steps mentioned in the article, we do the following:
-
-1. Crop the image on both sides where it is black.
-2. Change the size of the image to (256, 256).
-3. Flip the image randomly both horizontally and vertically with a 50% probability.
-4. Finally, normalize the image with a mean of zero and variance of one.
-
-## Model Implementation and Training
-
-The input size is (3, 256, 256). The model implementation involves using pre-trained weights from a 50-layer ResNet. After that, we use a D2convLSTM layer with 256 filters and a kernel size of 3, which enables the model to learn dependencies between changes and previous actions. After batch normalization and flattening, we use fully connected layers with 1000, 256, and 10 neurons respectively, using ReLU, ReLU, ReLU, and sigmoid activation functions for classification into the two classes: violence and non-violence. As per the article, we use the RMSprop optimizer with an initial learning rate parameter of 0.0001. After experimentation, it was observed that this learning rate provided smoother learning compared to 0.001, which was also mentioned at the end of the article. Due to the classification nature of the problem, binary cross-entropy is used.
-
-## Data Splitting for Training, Validation, and Evaluation
-
-The data is divided into three sets for training, validation, and evaluation, with respective usage percentages of 80%, 5%, and 15%. During the training process, EarlyStopping with a parameter of 5 is used, which leads to the training process stopping at the 25th epoch. Additionally, a learning rate schedule is used to dynamically adjust the learning process, starting from 0.0001 and decreasing to 0.00000325.
+model = build_model(frames=20)
+model.fit(train_clips, train_labels, epochs=20)
+print(from_predictions(test_labels, model.predict(test_clips)).format())
+```
 
 ## Results
 
-Based on the above results, we achieved good accuracy for both training and validation data. Additionally, for other metrics, we achieved 68% precision and recall on the validation data, resulting in a 68% score_1f for the validation data as well. The lack of smoothness for the validation data is due to the lower number of samples in this category (25 videos). In contrast, in the training data where the count is higher (400 videos), the various assessment measures show a smoother increase, leading to a reduction in loss.
+### Price forecasting
 
-Finally, the results for the test data are as follows:
+A hybrid model with parallel LSTM and GRU branches over the same 30-day window,
+concatenated before the output, measured against a single-LSTM baseline on two
+coins at three forecast horizons. RMSE in each coin's own price units, lower is
+better.
 
-- Evaluation Metrics for Test Data
+| coin | horizon | hybrid | LSTM baseline |
+| --- | --- | --- | --- |
+| Litecoin | short | 8.52 | 9.07 |
+| Litecoin | medium | 12.12 | 12.02 |
+| Litecoin | long | 16.28 | 16.00 |
+| Monero | short | 11.10 | 12.74 |
+| Monero | medium | 14.63 | 15.40 |
+| Monero | long | 19.84 | 20.34 |
 
-In the evaluation data, which consists of 75 videos, we achieved an accuracy of 94%, and other measured values such as precision, recall, and score_1f are 73%, 74%, and 73% respectively. This demonstrates a good accuracy relative to the number of available data.
+The hybrid wins four of six, and the pattern matters more than the count. Its
+clearest margin is at the shortest horizon on both coins, 6% better RMSE on
+Litecoin and 13% on Monero. By the longest horizon the Monero advantage narrows
+to 2.5% and the Litecoin one has reversed. The extra branch helps where there is
+short-range structure to exploit and stops helping once the horizon is long
+enough that little remains to find. MAPE sits between 6% and 9% throughout.
 
-Moreover, the confusion matrix for all three data categories (training, validation, and evaluation) clearly shows how each video was categorized.
+### Violence detection
+
+ResNet50 is applied per frame through `TimeDistributed`, producing a sequence of
+spatial feature maps, and a `ConvLSTM2D` reads that sequence while preserving the
+spatial layout, so motion between frames stays localised rather than being
+flattened before the temporal model sees it.
+
+Test set of 150 clips, confusion matrix `[[72, 3], [5, 70]]`:
+
+| metric | value |
+| --- | --- |
+| accuracy | 94.7% |
+| precision | 95.9% |
+| recall | 93.3% |
+| F1 | 94.6% |
+
+Every figure follows from the counts. `violence_detection.metrics` sums true and
+false positives across the whole split before taking any ratio, because
+precision, recall and F1 are ratios of counts and a mean of per-batch ratios is a
+different quantity. A test demonstrates the gap on a four-sample example where
+batch-averaged precision gives 0.75 and accumulated precision gives 0.67.
+
+## Data handling
+
+`forecasting.split` cuts the series at a point in time: everything before trains,
+everything after tests, and the scaler is fitted on the training section only.
+Both matter on a time series. A random split draws training windows from after
+test windows and asks the model to predict a past it has already seen, and a
+scaler fitted on the full series carries the test period's range into training
+features. Tests assert both properties directly.
+
+The forecasting head is linear rather than rectified, since a head that cannot go
+below zero has no gradient with which to correct an under-prediction.
+
+## Project structure
+
+```
+forecasting/
+    data.py       windowing and chronological splitting
+    models.py     hybrid LSTM and GRU model, and the LSTM baseline
+    metrics.py    MSE, RMSE, MAE, MAPE
+violence_detection/
+    model.py      ResNet50 per frame, ConvLSTM over time
+    metrics.py    counts accumulated over a split, then the ratio
+tests/            leakage, metric correctness and model wiring
+docs/             figures referenced by this README
+pyproject.toml    dependencies
+```
+
+## Components
+
+| module | responsibility |
+| --- | --- |
+| `forecasting.data` | Builds supervised windows and the chronological split |
+| `forecasting.models` | Builds and compiles both forecasting architectures |
+| `forecasting.metrics` | Error measures in the series' own price units |
+| `violence_detection.model` | Builds the frame encoder and temporal head |
+| `violence_detection.metrics` | Confusion counts and the metrics derived from them |
+
+## Testing
+
+```bash
+python -m pytest tests/
+```
+
+Twenty-two tests covering window construction, split chronology, scaler
+containment, every error measure, metric accumulation, and model output shapes.
+Models are built without pretrained weights, so nothing is downloaded.
